@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Recursion-teamdev-go-lang-teamc/space-app/internal/handlers"
+	"github.com/stshf/space-app/internal/handlers"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/Recursion-teamdev-go-lang-teamc/space-app
+module github.com/stshf/space-app
 
 go 1.23.2
 

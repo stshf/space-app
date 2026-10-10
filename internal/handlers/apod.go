@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Recursion-teamdev-go-lang-teamc/space-app/internal/client"
-	"github.com/Recursion-teamdev-go-lang-teamc/space-app/internal/utils"
+	"github.com/stshf/space-app/internal/client"
+	"github.com/stshf/space-app/internal/utils"
 )
 
 const (
