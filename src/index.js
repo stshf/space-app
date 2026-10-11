@@ -2,6 +2,9 @@ const APOD_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
 const DEFAULT_APOD_COUNT = 8;
 const FIRST_APOD_DATE = new Date("1995-06-16");
 const PLACEHOLDER_IMAGE = "news-thumbnail.png";
+const MAX_ATTEMPTS = 4;
+// 取得に失敗する日があるので、多めに取りに行って成功した分から使う
+const RANDOM_FETCH_COUNT = 12;
 
 export default {
   async fetch(request, env) {
@@ -71,12 +74,22 @@ function normalizeApod(apod) {
   return apod;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// NASA側のボット判定で 403 が返ることがあるので、少し待って取り直す
 async function fetchApod(path = "") {
-  const res = await fetch(APOD_URL + path);
-  if (!res.ok) {
-    throw new Error(`NASA API returns non 200 status: ${res.status}`);
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(APOD_URL + path);
+    if (res.ok) {
+      return res.json();
+    }
+    if (res.status === 404 || attempt >= MAX_ATTEMPTS) {
+      throw new Error(`NASA API returns non 200 status: ${res.status}`);
+    }
+    await sleep(1000 * attempt);
   }
-  return res.json();
 }
 
 async function handleApod(url) {
@@ -101,11 +114,12 @@ async function handleApod(url) {
 }
 
 async function handleApods() {
-  const ids = randomApodIds(DEFAULT_APOD_COUNT);
+  const ids = randomApodIds(RANDOM_FETCH_COUNT);
   const results = await Promise.allSettled(ids.map((id) => fetchApod(`/${id}`)));
   const apods = results
     .filter((result) => result.status === "fulfilled")
-    .map((result) => normalizeApod(result.value));
+    .map((result) => normalizeApod(result.value))
+    .slice(0, DEFAULT_APOD_COUNT);
 
   if (apods.length === 0) {
     return new Response("Service Unavailable", { status: 503 });
