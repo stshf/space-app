@@ -1,4 +1,7 @@
-.env
 node_modules/
 .wrangler/
 .dev.vars
+.env
+.claude/
+# npm run build で生成される
+public/app.css

@@ -3,7 +3,22 @@
   "name": "space-app",
   "main": "src/index.js",
   "compatibility_date": "2026-10-01",
+  "build": {
+    // CSS を Tailwind でビルドしてから配信する（wrangler dev / deploy のたびに実行）
+    "command": "npm run build",
+    "watch_dir": "frontend"
+  },
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+    "binding": "ASSETS",
+    // "/" も Worker を通して、共有リンク（?date=）に OGP とセキュリティヘッダーを付ける
+    "run_worker_first": ["/api/*", "/"]
+  },
+  "kv_namespaces": [
+    {
+      // 過去の日付の APOD は変わらないので、ここに保存して NASA への問い合わせを減らす
+      "binding": "APOD_CACHE",
+      "id": "fb6fe14e9999440aa9716c63bff83e64"
+    }
+  ]
 }
