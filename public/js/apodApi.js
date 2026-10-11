@@ -8,7 +8,7 @@ import {
 } from "./apodRenderer.js";
 
 async function fetchAPOD() {
-    let url = new URL("http://localhost:8000/api/apod");
+    let url = new URL("/api/apod", location.origin);
     const date = document.getElementById("date").value
     const params = new URLSearchParams({
         date: date
@@ -37,7 +37,7 @@ async function fetchAPOD() {
 }
 
 async function fetchAPODs() {
-    let url = new URL("http://localhost:8000/api/apods/random");
+    let url = new URL("/api/apods/random", location.origin);
     const date = ""
     const params = new URLSearchParams({
         date: date
