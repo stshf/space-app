@@ -1,12 +1,29 @@
-name: Deploy
+name: Test and Deploy
 
 on:
+  pull_request:
   push:
     branches:
       - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - run: npm ci
+
+      - run: npm test
+
+      # CSS のビルドが通るかも確かめておく
+      - run: npm run build
+
   deploy:
+    # テストに合格したときだけ、main への push でデプロイする（PR ではデプロイしない）
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

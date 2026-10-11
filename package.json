@@ -1,18 +1,21 @@
 {
-  "name": "my-space-app",
+  "name": "space-app",
   "version": "1.0.0",
-  "description": "> このリポジトリは、Recursionのチーム開発で作成した [Recursion-teamdev-go-lang-teamc/space-app](https://github.com/Recursion-teamdev-go-lang-teamc/space-app) をベースに、個人で Cloudflare へのデプロイを練習するために移行したものです。 本アプリケーションは、[NASA Open APIs](https://api.nasa.gov/)のAPOD (Astronomy Picture of the Day)を利用した天体写真ビューアです。バックエンドはGo言語で実装され、フロントエンドのデモアプリケーションではカレンダービューとギャラリービューを提供しています。",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "private": true,
+  "description": "NASA の Astronomy Picture of the Day を表示する天体写真ビューア（Cloudflare Workers）",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tailwindcss -i ./frontend/styles.css -o ./public/app.css --minify",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3",
+    "vitest": "4.1.11",
     "wrangler": "^4.149.0"
   }
 }

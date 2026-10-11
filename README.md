@@ -2,62 +2,93 @@
 
 > このリポジトリは、Recursionのチーム開発で作成した [Recursion-teamdev-go-lang-teamc/space-app](https://github.com/Recursion-teamdev-go-lang-teamc/space-app) をベースに、個人で Cloudflare へのデプロイを練習するために移行したものです。
 
-NASAの APOD (Astronomy Picture of the Day) を表示する天体写真ビューアです。カレンダービューとギャラリービューを提供しています。
+NASAの APOD (Astronomy Picture of the Day) を表示する天体写真ビューアです。日付を選んで見る「一枚」ビューと、30年分からランダムに並べる「ギャラリー」ビューがあります。
 
 **公開URL: https://space-app.stsh.workers.dev**
 
 https://github.com/user-attachments/assets/2218264f-6f84-4693-953e-0319fd9fbe1b
 
 ## 特徴
-- 日付指定での天体写真表示
-- ランダムな天体写真のギャラリービュー（動画の回は埋め込みプレーヤーで表示）
-- Cloudflare Workers 上で動作（無料プランの範囲内）
-- APIキー不要
+- 1995年6月16日から今日まで、日付を選んで天体写真を表示（← → キーで前後の日へ）
+- 30年分からランダムに8枚を並べるギャラリー（動画の回は埋め込みプレーヤーで表示）
+- 日付ごとに共有できる URL（`/?date=2015-07-14`）。SNS で共有するとその日の写真がプレビューに出る（OGP）
+- スマホ対応・キーボード操作・スクリーンリーダー向けの読み上げに対応
+- Cloudflare Workers 上で動作（無料プランの範囲内）、APIキー不要
 
 ## 構成
 
 ```
 ブラウザ ──> space-app.stsh.workers.dev（Cloudflare Workers）
-               ├─ /index.html, /js/*  → public/ の静的ファイルをそのまま配信
-               └─ /api/*              → src/index.js（Worker）
-                                          └─> NASA (science.nasa.gov) の APOD データ
+               ├─ /app.css, /js/*, /favicon.svg → public/ の静的ファイルをそのまま配信
+               ├─ /                             → Worker が index.html に OGP とセキュリティヘッダーを付けて返す
+               └─ /api/*                        → Worker（src/）
+                                                   ├─> KV（過去の日付の APOD をキャッシュ）
+                                                   └─> NASA (science.nasa.gov) の APOD データ
 ```
 
 - 静的ファイルは [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/) で配信します。静的ファイルへのリクエストは無料・無制限です。
-- `public/` に該当するファイルがないリクエスト（`/api/*`）だけが Worker のコードに回ります。Worker の無料枠は 1日10万リクエストです。
+- `/` と `/api/*` だけ Worker を先に通します（`wrangler.jsonc` の `run_worker_first`）。Worker の無料枠は 1日10万リクエストです。
+- 過去の日付の APOD は内容が変わらないので、一度取得したら KV に保存し、以後は NASA に問い合わせません。
 
 ## 技術スタック
 ### フロントエンド
-- HTML5
-- Tailwind CSS（CDN）
-- JavaScript（ES Modules）
+- HTML / JavaScript（ES Modules、ビルド不要）
+- Tailwind CSS v4（`npm run build` でビルド。CDN は使わない）
 
 ### API
-- Cloudflare Workers（JavaScript）
+- Cloudflare Workers（JavaScript）、Workers KV
 - Wrangler（Cloudflare 公式 CLI）
+- Vitest（テスト）
 
 ## API
 
 | エンドポイント | 説明 |
 |---|---|
 | `GET /api/apod` | 最新の APOD を返す |
-| `GET /api/apod?date=MM/DD/YYYY` | 指定日の APOD を返す（形式が違う場合は 400） |
-| `GET /api/apods/random` | ランダムな日付の APOD を最大8件返す |
+| `GET /api/apod?date=YYYY-MM-DD` | 指定日の APOD を返す（旧形式 `MM/DD/YYYY` も可） |
+| `GET /api/apods/random` | ランダムな日付の APOD を最大8件返す（写真を優先） |
 
 レスポンス例:
 ```json
-{ "apod": { "date": "2015-07-14", "title": "New Horizons Passes Pluto and Charon", "hdurl": "https://...", "url": "https://...", "media_type": "image", "explanation": "...", "copyright": "..." } }
+{
+  "apod": {
+    "date": "2015-07-14",
+    "title": "New Horizons Passes Pluto and Charon",
+    "explanation": "Will the New Horizons spacecraft survive ...",
+    "credit": "NASA, Johns Hopkins Univ./APL, Southwest Research Inst.",
+    "alt": "",
+    "mediaType": "image",
+    "image": { "thumb": "https://...?w=640", "large": "https://...?w=1280", "full": "https://...?w=2048" },
+    "videoUrl": null,
+    "pageUrl": "https://science.nasa.gov/image-article/..."
+  }
+}
 ```
-`hdurl` が空文字のときは動画の回で、`url` に埋め込み用の URL（YouTube / Vimeo など）が入ります。
+
+- `mediaType` は `image` / `video` / `other`（インタラクティブなページなど、埋め込めないもの）。
+- 文字列はすべて **HTML タグを取り除いたプレーンテキスト**です。URL は許可したホスト（NASA の画像・ページ、YouTube・Vimeo のプレーヤー）の https のものだけを返します。
+- エラーは `{ "error": { "code": "...", "message": "..." } }` の形で返します。
+
+| ステータス | `code` | 意味 |
+|---|---|---|
+| 400 | `invalid_date` | 日付の形式が正しくない、または存在しない日付 |
+| 404 | `out_of_range` | 1995-06-16 より前、または未来の日付 |
+| 404 | `not_found` | その日の APOD が NASA にない |
+| 502 | `upstream_error` | NASA が応答しない（取り直しても失敗） |
 
 ## データ取得元について
-2026年9月29日に APOD のサイトが `apod.nasa.gov` から `science.nasa.gov/apod` に移転し、従来の `api.nasa.gov/planetary/apod` は全日付で NASA のロゴを返すようになりました（2026年12月1日に廃止予定）。
+2026年9月に APOD のサイトが `apod.nasa.gov` から `science.nasa.gov/apod` に移転し、従来の `api.nasa.gov/planetary/apod` は全日付で NASA のロゴを返すようになりました（2026年12月1日に停止予定）。
 そのため、現在は NASA Science の `https://science.nasa.gov/wp-json/wp/v2/apod-basic` からデータを取得しています。
 
-Worker（`src/index.js`）では、取得元の次の挙動に対応しています。
+Worker（`src/apod.js`）では、取得元の次の挙動に対応しています。
 - **日付指定はパス形式**: `apod-basic/YYMMDD`。ランダム取得の機能はないため、1995-06-16〜今日の中からランダムに日付を選び、並列に取得しています。
 - **画像が欠けている回がある**: 移行で画像が NASA のロゴ（`news-thumbnail.png`）に置き換わっている回は、`basic_html` に残っている本物の画像や動画の URL で補正しています。
+- **説明文などが HTML で届く**: タグを取り除いてプレーンテキストにしてから返します（`src/sanitize.js`）。フロントエンドも `innerHTML` を使わず `textContent` で表示するので、二重に XSS を防いでいます。
 - **ボット判定で 403 が返ることがある**: 待ち時間を延ばしながら最大4回取り直します。ランダム取得は多めに12件取りに行き、成功した中から8件を返します。
+
+## セキュリティ
+- `/` には Content-Security-Policy を付けています。スクリプトは自サイトのものだけ、画像は NASA、埋め込みは YouTube（no-cookie）と Vimeo だけを許可しています（`src/http.js`）。
+- 静的ファイルのヘッダーは `public/_headers` で設定しています（`_headers` は Worker が返す応答には効かないため、`/` と `/api/*` は Worker 側で付けています）。
 
 ## ローカル開発
 
@@ -72,14 +103,23 @@ npm install
 
 ### ローカルで起動
 ```bash
-npx wrangler dev
+npm run dev
 ```
-http://localhost:8787 で確認できます。`src/index.js` を保存すると自動で再読み込みされます。
+http://localhost:8787 で確認できます。起動時に CSS がビルドされます。`public/` の HTML や JS で新しい Tailwind のクラスを使ったときは、`npm run build` で CSS を作り直してください。
+
+### テスト
+```bash
+npm test
+```
+NASA への通信は偽物に差し替えてテストするので、ネットワークなしで動きます。
 
 ### デプロイ
+`main` に push（PR をマージ）すると、GitHub Actions がテストに合格したときだけ自動でデプロイします（`.github/workflows/deploy.yml`）。PR ではテストだけが走ります。
+
+手動でデプロイする場合:
 ```bash
 npx wrangler login   # 初回のみ
-npx wrangler deploy
+npm run deploy
 ```
 
 ### 本番のログを見る
@@ -90,16 +130,25 @@ npx wrangler tail space-app
 ## ディレクトリ構成
 ```
 .
+├── frontend/
+│   └── styles.css          # Tailwind の入力（ビルドすると public/app.css になる）
 ├── public/                 # 配信する静的ファイル（このフォルダの中身だけが公開される）
 │   ├── index.html
+│   ├── _headers            # 静的ファイル用のレスポンスヘッダー
+│   ├── favicon.svg
 │   └── js/
-│       ├── apodApi.js        # /api/* の呼び出し
-│       ├── apodRenderer.js   # APOD の描画
-│       ├── dateValidator.js  # 日付入力のチェック
-│       ├── modalController.js
-│       └── viewController.js
-├── src/
-│   └── index.js            # Worker（API）
+│       ├── main.js           # 画面の状態・URL・イベント
+│       ├── render.js         # 画面の部品
+│       ├── api.js            # /api/* の呼び出しとエラーメッセージ
+│       ├── dom.js            # innerHTML を使わない要素の組み立て
+│       └── dates.js          # 日付の計算と表示
+├── src/                    # Worker
+│   ├── index.js            # ルーティング・OGP の差し込み
+│   ├── apod.js             # NASA からの取得・補正・KV キャッシュ
+│   ├── sanitize.js         # HTML の除去・URL の許可リスト
+│   ├── dates.js            # 日付の検証
+│   └── http.js             # レスポンスとセキュリティヘッダー
+├── test/                   # Vitest のテスト
 ├── wrangler.jsonc          # Cloudflare Workers の設定
 ├── package.json
 ├── cmd/, internal/, go.mod # 旧 Go バックエンド（下記参照）
@@ -107,7 +156,7 @@ npx wrangler tail space-app
 ```
 
 ## 旧 Go バックエンドについて
-`cmd/` と `internal/` には、チーム開発時に作成した Go のバックエンドが残っています。Cloudflare Workers では Go のサーバーをそのまま動かせないため、同じ API を `src/index.js` に書き直しました。
+`cmd/` と `internal/` には、チーム開発時に作成した Go のバックエンドが残っています。Cloudflare Workers では Go のサーバーをそのまま動かせないため、同じ API を `src/` に書き直しました。
 Go 版は旧 API（`api.nasa.gov`）を使っているため、現在は正しいデータを返しません。参考用として残しています。
 [Swagger UI](https://recursion-teamdev-go-lang-teamc.github.io/space-app/swagger/) の仕様もチーム開発時（Go 版）のものです。
 

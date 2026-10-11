@@ -1,128 +1,137 @@
-const APOD_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
-const DEFAULT_APOD_COUNT = 8;
-const FIRST_APOD_DATE = new Date("1995-06-16");
-const PLACEHOLDER_IMAGE = "news-thumbnail.png";
-const MAX_ATTEMPTS = 4;
+import { getApodByDate, getLatestApod, NotFoundError } from "./apod.js";
+import { isInApodRange, parseDate, randomIsoDates, todayIso } from "./dates.js";
+import { json, jsonError, withSecurityHeaders } from "./http.js";
+
+const GALLERY_COUNT = 8;
 // 取得に失敗する日があるので、多めに取りに行って成功した分から使う
-const RANDOM_FETCH_COUNT = 12;
+const GALLERY_FETCH_COUNT = 12;
+const ONE_DAY = 24 * 60 * 60;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/apod") {
-      return handleApod(url);
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return jsonError(405, "method_not_allowed", "GET only");
     }
-    if (url.pathname === "/api/apods/random") {
-      return handleApods();
+
+    try {
+      if (url.pathname === "/api/apod") {
+        return await handleApod(url, env, ctx);
+      }
+      if (url.pathname === "/api/apods/random") {
+        return await handleRandom(env, ctx);
+      }
+      if (url.pathname.startsWith("/api/")) {
+        return jsonError(404, "not_found", "Unknown API endpoint");
+      }
+      if (url.pathname === "/" && env.ASSETS) {
+        return await handleIndex(request, url, env, ctx);
+      }
+    } catch (err) {
+      console.error("Unhandled error", err);
+      return jsonError(500, "internal_error", "Something went wrong");
     }
-    return new Response("Not Found", { status: 404 });
+
+    return env.ASSETS ? env.ASSETS.fetch(request) : jsonError(404, "not_found", "Not found");
   },
 };
 
-// "10/01/2025" (MM/DD/YYYY) → "251001" (YYMMDD)
-function convertDate(input) {
-  const match = input.match(/^(\d{2})\/(\d{2})\/\d{2}(\d{2})$/);
-  if (!match) {
-    return null;
-  }
-  const [, month, day, year] = match;
-  return `${year}${month}${day}`;
-}
+async function handleApod(url, env, ctx) {
+  const dateParam = url.searchParams.get("date");
 
-// Date → "251001" (YYMMDD)
-function toApodId(date) {
-  return date.toISOString().slice(2, 10).replaceAll("-", "");
-}
-
-function randomApodIds(count) {
-  const start = FIRST_APOD_DATE.getTime();
-  const end = Date.now();
-  const ids = [];
-  for (let i = 0; i < count; i++) {
-    const time = start + Math.random() * (end - start);
-    ids.push(toApodId(new Date(time)));
-  }
-  return ids;
-}
-
-// basic_html の中から <tag src="..."> の src を取り出す
-function findSrc(html, tag) {
-  const match = html.match(new RegExp(`<${tag}[^>]+src="([^"]+)"`, "i"));
-  if (!match) {
-    return null;
-  }
-  const src = match[1].replaceAll("&#038;", "&");
-  return src.startsWith("//") ? `https:${src}` : src;
-}
-
-// 移行で壊れたデータを、basic_html に残っている本物のURLで補正する
-function normalizeApod(apod) {
-  const html = apod.basic_html ?? "";
-
-  const videoUrl = findSrc(html, "iframe");
-  if (videoUrl) {
-    return { ...apod, url: videoUrl, hdurl: "" };
+  if (!dateParam) {
+    return respondWithApod(() => getLatestApod(env, ctx), 5 * 60);
   }
 
-  if (apod.hdurl?.includes(PLACEHOLDER_IMAGE)) {
-    const imageUrl = findSrc(html, "img");
-    if (imageUrl) {
-      return { ...apod, url: imageUrl, hdurl: imageUrl };
-    }
+  const date = parseDate(dateParam);
+  if (!date) {
+    return jsonError(400, "invalid_date", "date must be YYYY-MM-DD");
   }
-  return apod;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// NASA側のボット判定で 403 が返ることがあるので、少し待って取り直す
-async function fetchApod(path = "") {
-  for (let attempt = 1; ; attempt++) {
-    const res = await fetch(APOD_URL + path);
-    if (res.ok) {
-      return res.json();
-    }
-    if (res.status === 404 || attempt >= MAX_ATTEMPTS) {
-      throw new Error(`NASA API returns non 200 status: ${res.status}`);
-    }
-    await sleep(1000 * attempt);
+  if (!isInApodRange(date)) {
+    return jsonError(404, "out_of_range", "APOD exists from 1995-06-16 to today");
   }
+  const cacheSeconds = date < todayIso() ? ONE_DAY : 5 * 60;
+  return respondWithApod(() => getApodByDate(date, env, ctx), cacheSeconds);
 }
 
-async function handleApod(url) {
-  const date = url.searchParams.get("date");
-
+async function respondWithApod(load, cacheSeconds) {
   try {
-    if (!date) {
-      const latest = await fetchApod();
-      return Response.json({ apod: normalizeApod(latest[0]) });
-    }
-
-    const id = convertDate(date);
-    if (!id) {
-      return new Response("Bad Request", { status: 400 });
-    }
-    const apod = await fetchApod(`/${id}`);
-    return Response.json({ apod: normalizeApod(apod) });
+    return json({ apod: await load() }, { cacheSeconds });
   } catch (err) {
-    console.error("Error fetching APOD data", err);
-    return new Response("Service Unavailable", { status: 503 });
+    if (err instanceof NotFoundError) {
+      return jsonError(404, "not_found", "No APOD for this date");
+    }
+    console.error("Error fetching APOD", err);
+    return jsonError(502, "upstream_error", "NASA API is not responding");
   }
 }
 
-async function handleApods() {
-  const ids = randomApodIds(RANDOM_FETCH_COUNT);
-  const results = await Promise.allSettled(ids.map((id) => fetchApod(`/${id}`)));
+async function handleRandom(env, ctx) {
+  const dates = randomIsoDates(GALLERY_FETCH_COUNT);
+  const results = await Promise.allSettled(
+    dates.map((date) => getApodByDate(date, env, ctx, { retryDelayMs: 500 })),
+  );
   const apods = results
     .filter((result) => result.status === "fulfilled")
-    .map((result) => normalizeApod(result.value))
-    .slice(0, DEFAULT_APOD_COUNT);
+    .map((result) => result.value);
 
-  if (apods.length === 0) {
-    return new Response("Service Unavailable", { status: 503 });
+  // ギャラリーは写真を優先し、足りなければ動画などで埋める
+  const images = apods.filter((apod) => apod.mediaType === "image");
+  const others = apods.filter((apod) => apod.mediaType !== "image");
+  const picked = [...images, ...others].slice(0, GALLERY_COUNT);
+
+  if (picked.length === 0) {
+    return jsonError(502, "upstream_error", "NASA API is not responding");
   }
-  return Response.json({ apods });
+  return json({ apods: picked });
+}
+
+// 共有された /?date=YYYY-MM-DD のリンクに、その日の写真のプレビュー（OGP）を付ける
+async function handleIndex(request, url, env, ctx) {
+  const page = await env.ASSETS.fetch(request);
+  const date = parseDate(url.searchParams.get("date") ?? "");
+  if (!date || !isInApodRange(date) || typeof HTMLRewriter === "undefined") {
+    return withSecurityHeaders(page, { html: true });
+  }
+
+  let apod;
+  try {
+    apod = await getApodByDate(date, env, ctx);
+  } catch {
+    return withSecurityHeaders(page, { html: true });
+  }
+
+  const title = `${apod.title} — SPACE APP`;
+  const description = apod.explanation.length > 120
+    ? `${apod.explanation.slice(0, 120)}…`
+    : apod.explanation;
+  const meta = {
+    "og:title": title,
+    "og:description": description,
+    "og:url": `${url.origin}/?date=${date}`,
+    "og:image": apod.image?.large,
+    "twitter:title": title,
+    "twitter:description": description,
+    "twitter:image": apod.image?.large,
+    description,
+  };
+
+  const rewritten = new HTMLRewriter()
+    .on("title", {
+      element(element) {
+        element.setInnerContent(title);
+      },
+    })
+    .on("meta", {
+      element(element) {
+        const key = element.getAttribute("property") ?? element.getAttribute("name");
+        if (key && meta[key]) {
+          element.setAttribute("content", meta[key]);
+        }
+      },
+    })
+    .transform(page);
+
+  return withSecurityHeaders(rewritten, { html: true });
 }
