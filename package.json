@@ -1,0 +1,18 @@
+{
+  "name": "my-space-app",
+  "version": "1.0.0",
+  "description": "> このリポジトリは、Recursionのチーム開発で作成した [Recursion-teamdev-go-lang-teamc/space-app](https://github.com/Recursion-teamdev-go-lang-teamc/space-app) をベースに、個人で Cloudflare へのデプロイを練習するために移行したものです。 本アプリケーションは、[NASA Open APIs](https://api.nasa.gov/)のAPOD (Astronomy Picture of the Day)を利用した天体写真ビューアです。バックエンドはGo言語で実装され、フロントエンドのデモアプリケーションではカレンダービューとギャラリービューを提供しています。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  }
+}
