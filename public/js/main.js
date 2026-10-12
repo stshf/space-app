@@ -1,6 +1,8 @@
 import { describeError, fetchApod, fetchRandomApods } from "./api.js";
 import { addDays, FIRST_APOD_DATE, formatJapaneseDate, isIsoDate, randomDateBetween } from "./dates.js";
 import { h } from "./dom.js";
+import { mountObservatory } from "./observatory.js";
+import { serialOf } from "./observatory-model.js";
 import { renderCard, renderCardSkeleton, renderDetail, renderDetailSkeleton, renderError } from "./render.js";
 
 const $ = (id) => document.getElementById(id);
@@ -20,6 +22,10 @@ const elements = {
   dialogBody: $("dialog-body"),
   dialogClose: $("dialog-close"),
   status: $("status"),
+  crumb: $("crumb-current"),
+  metaLine: $("meta-line"),
+  requestLine: $("request-line"),
+  copyRequest: $("copy-request"),
 };
 
 const state = {
@@ -31,6 +37,15 @@ const state = {
 
 let detailRequest = null;
 let galleryRequest = null;
+
+const observatory = mountObservatory(document.getElementById("observatory"), {
+  readout: document.querySelector("[data-readout]"),
+  onPick: (date) => goToDate(date),
+});
+
+function setRequest(path) {
+  elements.requestLine.textContent = `GET ${path}`;
+}
 
 function announce(message) {
   elements.status.textContent = message;
@@ -113,12 +128,15 @@ async function loadDetail() {
   elements.detail.replaceChildren(renderDetailSkeleton());
   updateDateControls();
 
+  setRequest(state.date ? `/api/apod?date=${state.date}` : "/api/apod");
   try {
     const apod = await fetchApod(state.date, { signal: controller.signal });
     if (!state.date) {
       state.latestDate = apod.date;
     }
     state.shownDate = apod.date;
+    observatory.show(apod.date, state.latestDate);
+    elements.metaLine.textContent = `No. ${serialOf(apod.date).toLocaleString("en-US")} · NASA APOD · Observatory`;
     elements.detail.replaceChildren(
       renderDetail(apod, { priority: true, actions: [shareAction(apod)] }),
     );
@@ -176,10 +194,11 @@ async function loadGallery() {
   elements.gallery.setAttribute("aria-busy", "true");
   elements.shuffle.disabled = true;
   elements.gallery.replaceChildren(...Array.from({ length: 8 }, renderCardSkeleton));
+  setRequest("/api/apods/random");
 
   try {
     const apods = await fetchRandomApods({ signal: controller.signal });
-    elements.gallery.replaceChildren(...apods.map((apod) => renderCard(apod, openDialog)));
+    elements.gallery.replaceChildren(...apods.map((apod) => renderCard(apod, openDialog, (picked) => observatory.preview(picked.date))));
     announce(`${apods.length}枚の写真を表示しました`);
   } catch (err) {
     if (err.name === "AbortError") {
@@ -204,6 +223,7 @@ let galleryLoaded = false;
 
 function render() {
   const isGallery = state.view === "gallery";
+  elements.crumb.textContent = isGallery ? "ギャラリー" : "一枚";
   elements.todayView.hidden = isGallery;
   elements.galleryView.hidden = !isGallery;
   for (const tab of document.querySelectorAll(".tab[data-nav]")) {
@@ -239,6 +259,17 @@ elements.random.addEventListener("click", () => {
   goToDate(randomDateBetween(FIRST_APOD_DATE, state.latestDate ?? new Date().toISOString().slice(0, 10)));
 });
 elements.shuffle.addEventListener("click", loadGallery);
+elements.gallery.addEventListener("pointerleave", () => observatory.rest());
+elements.copyRequest.addEventListener("click", async () => {
+  const path = elements.requestLine.textContent.replace(/^GET /, "");
+  try {
+    await navigator.clipboard.writeText(new URL(path, location.origin).href);
+    elements.copyRequest.dataset.copied = "";
+    setTimeout(() => delete elements.copyRequest.dataset.copied, 1200);
+  } catch {
+    // クリップボードが使えない環境では何もしない
+  }
+});
 document.getElementById("date-form").addEventListener("submit", (event) => event.preventDefault());
 
 for (const link of document.querySelectorAll("[data-nav]")) {
@@ -265,7 +296,9 @@ document.addEventListener("keydown", (event) => {
   if (typing || state.view !== "today" || elements.dialog.open || event.altKey || event.metaKey || event.ctrlKey) {
     return;
   }
-  if (event.key === "ArrowLeft" && !elements.prev.disabled) {
+  if (event.key.toLowerCase() === "r" && !event.shiftKey) {
+    elements.random.click();
+  } else if (event.key === "ArrowLeft" && !elements.prev.disabled) {
     elements.prev.click();
   } else if (event.key === "ArrowRight" && !elements.next.disabled) {
     elements.next.click();
@@ -289,6 +322,7 @@ if (state.date) {
   fetchApod(null)
     .then((apod) => {
       state.latestDate = apod.date;
+      observatory.setLatest(apod.date);
       updateDateControls();
     })
     .catch(() => {});
