@@ -31,9 +31,12 @@ export const SLIT_W = 8.5;
 export const RAIL_W = 2.6;
 export const SLIT_END = 104; // スリットは天頂を越えて 104° まで
 
-// 暦の目盛り：1 年をドームの前側 150° に割り当てる（Jan 1 から Dec 31 まで）
-export const SCALE_FROM = -30;
-export const SCALE_SPAN = 150;
+// 暦の目盛り：1 年をドームの前側 150° に割り当てる。画面の左が 1 月 1 日、右が 12 月 31 日
+// （方位は +x から +y へ増え、+y は画面の左なので、日付が進むと方位は減る）
+export const SCALE_FROM = 120;
+export const SCALE_SPAN = -150;
+export const SCALE_LOW = Math.min(SCALE_FROM, SCALE_FROM + SCALE_SPAN);
+export const SCALE_HIGH = Math.max(SCALE_FROM, SCALE_FROM + SCALE_SPAN);
 // 年の目盛り：1995 年が 14°、今年が 76°
 export const ALT_LOW = 14;
 export const ALT_HIGH = 76;
