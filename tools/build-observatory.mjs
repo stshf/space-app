@@ -108,7 +108,7 @@ function rail() {
   for (let day = 7; day < 364; day += 7) minors.push(tickAt(M.SCALE_FROM + (day / 364) * M.SCALE_SPAN, 1.6));
   out.push(L(minors.join(""), { tone: "lo" }), L(majors.join(""), { tone: "mid" }));
   // 目盛りの両端のストッパー
-  for (const deg of [M.SCALE_FROM - 3, M.SCALE_FROM + M.SCALE_SPAN + 3]) {
+  for (const deg of [M.SCALE_LOW - 3, M.SCALE_HIGH + 3]) {
     const d = polar(1, deg);
     const t = [-d[1], d[0]];
     const ring = [[M.RAIL_R - 4.4, -1.4], [M.RAIL_R - 0.4, -1.4], [M.RAIL_R - 0.4, 1.4], [M.RAIL_R - 4.4, 1.4]].map(([r, w]) => [d[0] * r + t[0] * w, d[1] * r + t[1] * w]);

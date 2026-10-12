@@ -259,6 +259,19 @@ elements.random.addEventListener("click", () => {
   goToDate(randomDateBetween(FIRST_APOD_DATE, state.latestDate ?? new Date().toISOString().slice(0, 10)));
 });
 elements.shuffle.addEventListener("click", loadGallery);
+for (const button of document.querySelectorAll("[data-step]")) {
+  button.addEventListener("click", () => {
+    const by = Number(button.dataset.by);
+    if (button.dataset.step === "year") {
+      observatory.stepYear(by);
+    } else if (button.dataset.step === "random") {
+      elements.random.click();
+    } else if (state.shownDate) {
+      const target = by < 0 ? elements.prev : elements.next;
+      if (!target.disabled) target.click();
+    }
+  });
+}
 elements.gallery.addEventListener("pointerleave", () => observatory.rest());
 elements.copyRequest.addEventListener("click", async () => {
   const path = elements.requestLine.textContent.replace(/^GET /, "");

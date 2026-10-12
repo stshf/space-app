@@ -87,8 +87,14 @@
     @apply mt-3 flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-muted;
   }
 
-  kbd {
+  kbd,
+  .kbd {
     @apply mr-1 inline-block min-w-[22px] rounded-[5px] bg-chip px-1.5 py-px text-center font-sans text-[13px] font-medium text-ink;
+  }
+
+  /* ヒントのキーは押せるボタンにもなっている（スマホではキーボードの代わり） */
+  button.kbd {
+    @apply cursor-pointer border-0 transition-colors hover:bg-line active:bg-line;
   }
 
   .readout {

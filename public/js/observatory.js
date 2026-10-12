@@ -118,10 +118,11 @@ export function mountObservatory(stage, { onPick = () => {}, readout } = {}) {
     { rootMargin: "120px 0px" },
   ).observe(stage);
 
-  // ドラッグ：左右で日付、上下で年。離したところの日付を開く
+  // ドラッグ：左右で日付、上下で年。離したところの日付を開く。
+  // 指で触ったときは左右だけを使い、上下はページのスクロールに任せる
   stage.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
-    drag = { x: event.clientX, y: event.clientY, az: target.az, alt: target.alt, moved: false };
+    drag = { x: event.clientX, y: event.clientY, az: target.az, alt: target.alt, moved: false, touch: event.pointerType === "touch" };
     stage.setPointerCapture(event.pointerId);
     stage.dataset.dragging = "";
   });
@@ -129,9 +130,10 @@ export function mountObservatory(stage, { onPick = () => {}, readout } = {}) {
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
-    if (Math.hypot(dx, dy) > 3) drag.moved = true;
-    target.az = Math.min(M.SCALE_FROM + M.SCALE_SPAN, Math.max(M.SCALE_FROM, drag.az + dx * DEG_PER_PX_AZ));
-    target.alt = Math.min(M.ALT_HIGH, Math.max(M.ALT_LOW, drag.alt - dy * DEG_PER_PX_ALT));
+    if (Math.hypot(dx, drag.touch ? 0 : dy) > 3) drag.moved = true;
+    // 指を右へ動かすとスリットも右へ回る（方位は画面の右へ向かうほど小さい）
+    target.az = Math.min(M.SCALE_HIGH, Math.max(M.SCALE_LOW, drag.az - dx * DEG_PER_PX_AZ));
+    if (!drag.touch) target.alt = Math.min(M.ALT_HIGH, Math.max(M.ALT_LOW, drag.alt - dy * DEG_PER_PX_ALT));
     run();
   });
   const release = () => {
@@ -146,20 +148,32 @@ export function mountObservatory(stage, { onPick = () => {}, readout } = {}) {
     if (date !== shown) onPick(date);
   };
   stage.addEventListener("pointerup", release);
-  stage.addEventListener("pointercancel", release);
+  // ブラウザがスクロールに切り替えたときは、日付を開かずに元へ戻す
+  stage.addEventListener("pointercancel", () => {
+    if (!drag) return;
+    target.az = drag.az;
+    target.alt = drag.alt;
+    drag = null;
+    delete stage.dataset.dragging;
+    run();
+  });
 
-  // ↑ ↓ で 1 年ずつ。続けて押せるよう、少し待ってから開く
-  stage.addEventListener("keydown", (event) => {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-    event.preventDefault();
+  // 1 年ずつ動かす。続けて押せるよう、少し待ってから開く
+  function stepYear(by) {
     const from = M.dateOf(target.az, target.alt, latest);
-    const date = M.shiftYear(from, event.key === "ArrowUp" ? 1 : -1, latest);
+    const date = M.shiftYear(from, by, latest);
     aim(date);
     describe(date);
     clearTimeout(keyTimer);
     keyTimer = setTimeout(() => {
       if (date !== shown) onPick(date);
     }, 500);
+  }
+
+  stage.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    stepYear(event.key === "ArrowUp" ? 1 : -1);
   });
 
   draw();
@@ -176,6 +190,7 @@ export function mountObservatory(stage, { onPick = () => {}, readout } = {}) {
     preview(date) {
       aim(date);
     },
+    stepYear,
     rest() {
       if (shown) aim(shown);
     },
