@@ -144,7 +144,8 @@ describe("GET /api/apods/random", () => {
       i++;
       const start = Date.parse("1995-06-16");
       const span = Date.now() - start;
-      return i <= known.length ? (Date.parse(date) - start) / span : 0.5 + i / 1000;
+      // 正午を狙う。0 時ちょうどだと、テストと Worker で Date.now() がずれたときに前の日になってしまう
+      return i <= known.length ? (Date.parse(date) + 12 * 3600 * 1000 - start) / span : 0.5 + i / 1000;
     });
 
     const res = await call("/api/apods/random");
