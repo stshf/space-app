@@ -4,11 +4,14 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
 
+# HTML（/）はキャッシュされないので、CSS と JS もブラウザに古いものを使い続けさせない。
+# max-age があると、デプロイ直後に新しい HTML と古い CSS が組み合わさって図が真っ黒になる。
+# no-cache は「毎回 ETag で確かめる」なので、変わっていなければ 304 で済む。
 /js/*
-  Cache-Control: public, max-age=300
+  Cache-Control: no-cache
 
 /app.css
-  Cache-Control: public, max-age=300
+  Cache-Control: no-cache
 
 /favicon.svg
   Cache-Control: public, max-age=86400
