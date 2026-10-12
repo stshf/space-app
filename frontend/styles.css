@@ -1,82 +1,176 @@
 @import "tailwindcss" source(none);
+@import "./iso.css";
+@import "./observatory.css";
 @source "../public";
 
 @theme {
   --font-sans: "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
-  --color-space-950: #04050d;
-  --color-space-900: #080b1a;
-  --color-space-800: #10152b;
-  --color-star: #f5f3ea;
-  --color-accent: #f6c56b;
-  --color-accent-strong: #ffb347;
-  --color-nebula: #8b7cf6;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --color-paper: #f7f7f6;
+  --color-card: #ffffff;
+  --color-ink: #1b1b1b;
+  --color-muted: #8c8c8c;
+  --color-faint: #b9b9b9;
+  --color-line: #e4e4e2;
+  --color-chip: #ececea;
+  --color-alert: #b4412f;
 }
 
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply min-h-dvh bg-space-950 font-sans text-star antialiased;
-    /* 星空：小さな点を重ねた背景と、ぼんやり光る星雲 */
-    background-image:
-      radial-gradient(1px 1px at 20px 30px, rgb(255 255 255 / 0.55), transparent),
-      radial-gradient(1px 1px at 120px 80px, rgb(255 255 255 / 0.35), transparent),
-      radial-gradient(1.5px 1.5px at 200px 150px, rgb(255 255 255 / 0.5), transparent),
-      radial-gradient(1px 1px at 280px 40px, rgb(255 255 255 / 0.3), transparent),
-      radial-gradient(1px 1px at 340px 210px, rgb(255 255 255 / 0.45), transparent),
-      radial-gradient(60rem 40rem at 85% -10%, rgb(139 124 246 / 0.18), transparent 70%),
-      radial-gradient(50rem 35rem at -10% 20%, rgb(56 189 248 / 0.10), transparent 70%);
-    background-size: 360px 260px, 360px 260px, 360px 260px, 360px 260px, 360px 260px, 100% 100%, 100% 100%;
-    background-attachment: fixed;
+    @apply min-h-dvh bg-paper font-sans text-ink antialiased;
   }
 
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent;
+    @apply outline-1 outline-offset-4 outline-muted;
   }
 
   ::selection {
-    @apply bg-accent text-space-950;
+    @apply bg-ink text-paper;
   }
 }
 
 @layer components {
-  .panel {
-    @apply rounded-2xl border border-white/10 bg-white/[0.04] shadow-2xl shadow-black/40 backdrop-blur-md;
+  .page {
+    @apply mx-auto max-w-[720px] px-4 pt-10 pb-16 sm:px-6;
   }
 
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-star transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40;
-  }
-
-  .btn-primary {
-    @apply border-transparent bg-accent text-space-950 hover:bg-accent-strong;
-  }
-
-  .btn-icon {
-    @apply size-10 px-0;
+  /* タブとパンくず */
+  .tabs {
+    @apply flex gap-8 border-b border-line pb-[18px];
   }
 
   .tab {
-    @apply rounded-full px-4 py-1.5 text-sm font-medium text-star/70 transition hover:text-star;
+    @apply text-[17px] text-muted transition-colors hover:text-ink;
   }
 
   .tab[aria-current="page"] {
-    @apply bg-white/10 text-star;
+    @apply text-ink;
+  }
+
+  .crumbs {
+    @apply mt-7 flex flex-wrap items-center gap-2.5 text-base text-muted;
+  }
+
+  .crumbs a {
+    @apply hover:text-ink;
+  }
+
+  .crumbs-sep {
+    @apply text-faint;
+  }
+
+  .meta {
+    @apply mt-1 text-[17px] text-muted;
+  }
+
+  /* 図の下のヒントと読み取り値 */
+  .obs-stage {
+    @apply cursor-grab touch-pan-y select-none;
+  }
+
+  .obs-stage[data-dragging] {
+    @apply cursor-grabbing;
+  }
+
+  .obs-stage:focus-visible {
+    outline: 1px solid var(--anatomy-muted);
+    outline-offset: 6px;
+  }
+
+  .hints {
+    @apply mt-3 flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-muted;
+  }
+
+  kbd {
+    @apply mr-1 inline-block min-w-[22px] rounded-[5px] bg-chip px-1.5 py-px text-center font-sans text-[13px] font-medium text-ink;
+  }
+
+  .readout {
+    @apply mt-3.5 min-h-[1.5em] text-[15px] tabular-nums;
+  }
+
+  .lede {
+    @apply mt-11 text-[17px] leading-[1.7];
+  }
+
+  /* 入力欄とボタン */
+  .label {
+    @apply mb-2.5 block text-[15px] font-normal text-muted;
+  }
+
+  .field {
+    @apply flex flex-wrap items-center gap-2 rounded-[14px] border border-line bg-card py-2.5 pr-2.5 pl-3 shadow-[0_1px_2px_rgb(0_0_0/0.03)];
+  }
+
+  .field-input {
+    @apply min-w-0 border-0 bg-transparent px-1 font-mono text-[15px] text-ink outline-none;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[9px] border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply border-ink bg-ink text-paper hover:bg-ink/85;
+  }
+
+  .btn-icon {
+    @apply size-9 px-0;
   }
 
   .skeleton {
-    @apply animate-pulse rounded-xl bg-white/[0.06];
+    @apply animate-pulse rounded-xl bg-chip;
+  }
+
+  .media {
+    @apply overflow-hidden rounded-xl border border-line bg-card;
   }
 
   .card {
-    @apply block w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.06];
+    @apply block w-full text-left;
   }
 
-  .meta-label {
-    @apply text-xs font-semibold tracking-[0.2em] text-accent uppercase;
+  .card .media {
+    @apply transition duration-200;
+  }
+
+  .card:hover .media,
+  .card:focus-visible .media {
+    @apply -translate-y-0.5 shadow-[0_6px_18px_rgb(0_0_0/0.06)];
+  }
+
+  .code-card {
+    @apply flex items-start justify-between gap-4 rounded-2xl border border-line bg-card px-6 py-5 shadow-[0_1px_2px_rgb(0_0_0/0.03)];
+  }
+
+  .code-card code {
+    @apply font-mono text-[15px] leading-relaxed break-all;
+  }
+
+  .copy {
+    @apply flex-none p-0.5 text-faint transition-colors hover:text-ink;
+  }
+
+  .copy[data-copied] {
+    @apply text-ink;
+  }
+
+  .foot {
+    @apply mt-12 border-t border-line pt-[18px] text-[13px] text-muted;
+  }
+
+  .foot a {
+    @apply underline underline-offset-[3px] hover:text-ink;
+  }
+
+  .dialog {
+    @apply m-auto max-h-[calc(100dvh-2rem)] w-[min(44rem,calc(100%-2rem))] overflow-y-auto rounded-2xl border border-line bg-paper p-0 text-ink shadow-[0_24px_60px_rgb(0_0_0/0.12)];
   }
 }
 
@@ -90,6 +184,6 @@
 }
 
 dialog::backdrop {
-  background: rgb(4 5 13 / 0.8);
-  backdrop-filter: blur(4px);
+  background: rgb(247 247 246 / 0.6);
+  backdrop-filter: blur(6px);
 }

@@ -9,7 +9,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "figure": "node tools/build-observatory.mjs"
   },
   "license": "MIT",
   "devDependencies": {

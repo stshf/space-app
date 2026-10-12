@@ -1,0 +1,9 @@
+/* 天文台の図だけで使う色。ほかはキットの iso.css のトークンを使う */
+.iso { --obs-cavity: #3b3b3f; --obs-lens: #2a2a2e; --obs-glass: #e9ecef; }
+.iso[data-theme="dark"] { --obs-cavity: #050505; --obs-lens: #000; --obs-glass: #1a1d22; }
+.obs-cavity { fill: var(--obs-cavity); stroke: none; }
+.obs-lens { fill: var(--obs-lens); stroke: none; }
+.obs-glass { fill: var(--obs-glass); stroke: none; }
+.obs-vent { fill: var(--anatomy-shade-0); stroke: none; }
+/* スリットの奥は暗いので、中の望遠鏡は一段明るい色で描く */
+[data-part="telescope"] { --anatomy-shade-0: #9a9a9e; --anatomy-shade-1: #b4b4b8; --anatomy-shade-2: #cacace; --anatomy-shade-3: #dcdcdf; --anatomy-lit-shade: #d6d6d9; --anatomy-paper: #c4c4c8; }

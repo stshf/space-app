@@ -34,6 +34,7 @@ https://github.com/user-attachments/assets/2218264f-6f84-4693-953e-0319fd9fbe1b
 ### フロントエンド
 - HTML / JavaScript（ES Modules、ビルド不要）
 - Tailwind CSS v4（`npm run build` でビルド。CDN は使わない）
+- アイソメトリックの天文台の図（SVG）：[anatomy](https://github.com/wheresryan22/anatomy) スキルのキット（MIT）で描画
 
 ### API
 - Cloudflare Workers（JavaScript）、Workers KV
@@ -127,11 +128,22 @@ npm run deploy
 npx wrangler tail space-app
 ```
 
+### 天文台の図を描き直す
+図の静的な部分は `public/index.html` に書き込まれています。寸法や部品を変えたら、次のコマンドで書き直してください。
+```bash
+npm run figure
+```
+ドームの向きが「その年の何日目か」（建物の縁の暦の目盛り、前側の 150°）、望遠鏡の高さが「何年か」（1995 年が 14°、今年が 76°）を表します。図をドラッグすると日付を選べます。
+
 ## ディレクトリ構成
 ```
 .
 ├── frontend/
-│   └── styles.css          # Tailwind の入力（ビルドすると public/app.css になる）
+│   ├── styles.css          # Tailwind の入力（ビルドすると public/app.css になる）
+│   ├── iso.css             # 図のキットのスタイル（anatomy）
+│   └── observatory.css     # 天文台の図だけで使う色
+├── tools/
+│   └── build-observatory.mjs # 天文台の図を組み立てて index.html に書き込む
 ├── public/                 # 配信する静的ファイル（このフォルダの中身だけが公開される）
 │   ├── index.html
 │   ├── _headers            # 静的ファイル用のレスポンスヘッダー
@@ -141,7 +153,10 @@ npx wrangler tail space-app
 │       ├── render.js         # 画面の部品
 │       ├── api.js            # /api/* の呼び出しとエラーメッセージ
 │       ├── dom.js            # innerHTML を使わない要素の組み立て
-│       └── dates.js          # 日付の計算と表示
+│       ├── dates.js          # 日付の計算と表示
+│       ├── observatory-model.js # 天文台の寸法・日付と角度の対応・動く部品の形
+│       ├── observatory.js    # 天文台を動かす（ドラッグ、キー、読み取り値）
+│       └── kit/              # anatomy の描画キット（MIT）
 ├── src/                    # Worker
 │   ├── index.js            # ルーティング・OGP の差し込み
 │   ├── apod.js             # NASA からの取得・補正・KV キャッシュ
